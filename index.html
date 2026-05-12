@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Iterable Catalog Copier</title>
+    <!--
+      Portable build (npm run build:portable): dist/ is static HTML+JS+CSS with relative paths.
+      Iterable’s API does not allow normal browser requests from file:// (CORS). Opening
+      index.html directly only works if the browser is started with web security disabled
+      for local testing, or if you serve this folder over http(s) with a same-origin proxy.
+    -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

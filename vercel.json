@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/iterable-api/:path*",
+      "destination": "https://api.iterable.com/api/:path*"
+    }
+  ]
+}

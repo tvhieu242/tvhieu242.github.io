@@ -1,0 +1,11 @@
+node_modules
+dist
+*.local
+.DS_Store
+
+# Local env files (may contain API keys / secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
