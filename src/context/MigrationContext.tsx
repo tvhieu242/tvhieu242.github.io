@@ -3,13 +3,20 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
+import { CatalogExistsConfirmDialog } from '../components/CatalogExistsConfirmDialog';
 import type { ApiLogEntry, CatalogProgress, CatalogRow } from '../types/iterable';
 
 const STORAGE_SOURCE = 'iterable-copier-source-key';
 const STORAGE_DEST = 'iterable-copier-dest-key';
+
+export interface ExistingCatalogConfirmPayload {
+  sourceCatalogName: string;
+  destCatalogName: string;
+}
 
 export interface MigrationConfig {
   overwrite: boolean;
@@ -56,6 +63,7 @@ interface MigrationContextValue extends MigrationState {
   resetProgressForMigration: (catalogNames: string[]) => void;
   loadKeysFromStorage: () => void;
   persistKeys: () => void;
+  requestExistingCatalogConfirm: (payload: ExistingCatalogConfirmPayload) => Promise<boolean>;
 }
 
 const MigrationContext = createContext<MigrationContextValue | null>(null);
@@ -75,6 +83,32 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
   const [migrationRunning, setMigrationRunning] = useState(false);
   const [pendingMigrationStart, setPendingMigrationStart] = useState(false);
   const [activeMigrationCatalogs, setActiveMigrationCatalogs] = useState<string[]>([]);
+  const [existingCatalogConfirm, setExistingCatalogConfirm] = useState<ExistingCatalogConfirmPayload | null>(
+    null,
+  );
+  const existingCatalogConfirmResolverRef = useRef<((proceed: boolean) => void) | null>(null);
+
+  const requestExistingCatalogConfirm = useCallback((payload: ExistingCatalogConfirmPayload) => {
+    return new Promise<boolean>((resolve) => {
+      existingCatalogConfirmResolverRef.current = resolve;
+      setExistingCatalogConfirm(payload);
+    });
+  }, []);
+
+  const resolveExistingCatalogConfirm = useCallback((proceed: boolean) => {
+    setExistingCatalogConfirm(null);
+    const r = existingCatalogConfirmResolverRef.current;
+    existingCatalogConfirmResolverRef.current = null;
+    r?.(proceed);
+  }, []);
+
+  const onExistingCatalogContinue = useCallback(() => {
+    resolveExistingCatalogConfirm(true);
+  }, [resolveExistingCatalogConfirm]);
+
+  const onExistingCatalogSkip = useCallback(() => {
+    resolveExistingCatalogConfirm(false);
+  }, [resolveExistingCatalogConfirm]);
 
   const setSourceKey = useCallback((v: string) => {
     setSourceKeyState(v);
@@ -179,6 +213,7 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
       resetProgressForMigration,
       loadKeysFromStorage,
       persistKeys,
+      requestExistingCatalogConfirm,
     }),
     [
       step,
@@ -202,10 +237,22 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
       resetProgressForMigration,
       persistKeys,
       loadKeysFromStorage,
+      requestExistingCatalogConfirm,
     ],
   );
 
-  return <MigrationContext.Provider value={value}>{children}</MigrationContext.Provider>;
+  return (
+    <MigrationContext.Provider value={value}>
+      {children}
+      <CatalogExistsConfirmDialog
+        open={existingCatalogConfirm !== null}
+        sourceCatalogName={existingCatalogConfirm?.sourceCatalogName ?? ''}
+        destCatalogName={existingCatalogConfirm?.destCatalogName ?? ''}
+        onContinue={onExistingCatalogContinue}
+        onSkip={onExistingCatalogSkip}
+      />
+    </MigrationContext.Provider>
+  );
 }
 
 export function useMigrationContext(): MigrationContextValue {

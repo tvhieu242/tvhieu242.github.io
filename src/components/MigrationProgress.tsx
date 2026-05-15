@@ -16,6 +16,8 @@ function phaseLabel(phase: CatalogMigrationPhase): string {
       return 'Done';
     case 'error':
       return 'Failed';
+    case 'skipped':
+      return 'Skipped';
     default:
       return phase;
   }
@@ -27,6 +29,8 @@ function phaseBadgeClass(phase: CatalogMigrationPhase): string {
       return 'bg-emerald-100 text-emerald-800';
     case 'error':
       return 'bg-red-100 text-red-800';
+    case 'skipped':
+      return 'bg-amber-100 text-amber-900';
     case 'copying-schema':
     case 'copying-items':
       return 'bg-sky-100 text-sky-800';
@@ -70,9 +74,11 @@ export function MigrationProgress() {
     void runMigrationRef.current(names);
   }, [pendingMigrationStart, setPendingMigrationStart]);
 
-  const allDone =
-    entries.length > 0 && entries.every((e) => e.phase === 'done' || e.phase === 'error');
+  const terminal = (p: CatalogMigrationPhase) =>
+    p === 'done' || p === 'error' || p === 'skipped';
+  const allDone = entries.length > 0 && entries.every((e) => terminal(e.phase));
   const hasError = entries.some((e) => e.phase === 'error');
+  const hasSkipped = entries.some((e) => e.phase === 'skipped');
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -119,11 +125,13 @@ export function MigrationProgress() {
 
       {allDone && !migrationRunning && (
         <div
-          className={`mb-4 rounded-lg px-3 py-2 text-sm ${hasError ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-900'}`}
+          className={`mb-4 rounded-lg px-3 py-2 text-sm ${hasError ? 'bg-amber-50 text-amber-900' : hasSkipped ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-900'}`}
         >
           {hasError
             ? 'Migration finished with errors. Use Retry failed or inspect the API log.'
-            : 'Migration completed successfully.'}
+            : hasSkipped
+              ? 'Migration finished. One or more catalogs were skipped after you chose not to continue.'
+              : 'Migration completed successfully.'}
         </div>
       )}
 
@@ -177,6 +185,21 @@ export function MigrationProgress() {
                 {p.totalItems > 0 ? ` / ${p.totalItems}` : ''}
                 {config.dryRun && p.phase !== 'pending' && ' (simulated)'}
               </p>
+              {p.phase === 'skipped' && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 rounded bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                  <span className="flex-1">
+                    Skipped because the destination catalog already exists and you chose not to continue.
+                  </span>
+                  <button
+                    type="button"
+                    disabled={migrationRunning}
+                    onClick={() => void retryCatalog(name)}
+                    className="rounded border border-amber-200 bg-white px-2 py-0.5 font-medium hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    Run again
+                  </button>
+                </div>
+              )}
               {p.error && (
                 <div className="mt-2 flex flex-wrap items-center gap-2 rounded bg-red-50 px-2 py-1 text-xs text-red-800">
                   <span className="flex-1">{p.error}</span>

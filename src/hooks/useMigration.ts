@@ -19,6 +19,7 @@ export function useMigration() {
     appendLog,
     updateCatalogProgress,
     setMigrationRunning,
+    requestExistingCatalogConfirm,
   } = useMigrationContext();
 
   const destinationCatalogName = useCallback(
@@ -48,7 +49,17 @@ export function useMigration() {
       setPhase('copying-schema');
       const mappings = await getFieldMappings(sourceKey, catalogName, log);
       if (!config.dryRun) {
-        await createCatalog(destKey, destCatalogName, log);
+        const { alreadyExists } = await createCatalog(destKey, destCatalogName, log);
+        if (alreadyExists) {
+          const proceed = await requestExistingCatalogConfirm({
+            sourceCatalogName: catalogName,
+            destCatalogName: destCatalogName,
+          });
+          if (!proceed) {
+            setPhase('skipped');
+            return;
+          }
+        }
         const hasDefined =
           mappings.definedMappings &&
           typeof mappings.definedMappings === 'object' &&
@@ -104,6 +115,7 @@ export function useMigration() {
       destinationCatalogName,
       log,
       updateCatalogProgress,
+      requestExistingCatalogConfirm,
     ],
   );
 

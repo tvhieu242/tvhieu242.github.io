@@ -75,7 +75,8 @@ export type CatalogMigrationPhase =
   | 'copying-schema'
   | 'copying-items'
   | 'done'
-  | 'error';
+  | 'error'
+  | 'skipped';
 
 export interface CatalogProgress {
   name: string;

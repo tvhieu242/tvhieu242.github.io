@@ -337,17 +337,23 @@ export async function createCatalog(
   if (res.ok) return { created: true, alreadyExists: false };
 
   let msg = '';
+  let code: string | undefined;
   try {
     const j = (await res.json()) as IterableApiResponse;
     msg = j.msg ?? '';
+    code = typeof j.code === 'string' ? j.code : undefined;
   } catch {
     msg = await res.text();
   }
   const lower = msg.toLowerCase();
-  if (
+  const duplicateCatalogName =
     res.status === 400 &&
-    (lower.includes('already') || lower.includes('exist') || lower.includes('duplicate'))
-  ) {
+    (lower.includes('already') ||
+      lower.includes('exist') ||
+      lower.includes('duplicate') ||
+      lower.includes('unique') ||
+      (code === 'BadParams' && lower.includes('unable to create a catalog')));
+  if (duplicateCatalogName) {
     return { created: false, alreadyExists: true };
   }
   throw new Error(msg || `Create catalog failed: ${res.status}`);
