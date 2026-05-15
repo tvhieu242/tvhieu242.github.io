@@ -8,7 +8,14 @@ import {
   type ReactNode,
 } from 'react';
 import { CatalogExistsConfirmDialog } from '../components/CatalogExistsConfirmDialog';
+import {
+  MappingsReviewDialog,
+  type MappingsReviewPayload,
+  type MappingsReviewResult,
+} from '../components/MappingsReviewDialog';
 import type { ApiLogEntry, CatalogProgress, CatalogRow } from '../types/iterable';
+
+export type { MappingsReviewPayload, MappingsReviewResult };
 
 const STORAGE_SOURCE = 'iterable-copier-source-key';
 const STORAGE_DEST = 'iterable-copier-dest-key';
@@ -64,6 +71,7 @@ interface MigrationContextValue extends MigrationState {
   loadKeysFromStorage: () => void;
   persistKeys: () => void;
   requestExistingCatalogConfirm: (payload: ExistingCatalogConfirmPayload) => Promise<boolean>;
+  requestMappingsReviewConfirm: (payload: MappingsReviewPayload) => Promise<MappingsReviewResult>;
 }
 
 const MigrationContext = createContext<MigrationContextValue | null>(null);
@@ -87,6 +95,8 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
     null,
   );
   const existingCatalogConfirmResolverRef = useRef<((proceed: boolean) => void) | null>(null);
+  const [mappingsReviewPayload, setMappingsReviewPayload] = useState<MappingsReviewPayload | null>(null);
+  const mappingsReviewResolverRef = useRef<((r: MappingsReviewResult) => void) | null>(null);
 
   const requestExistingCatalogConfirm = useCallback((payload: ExistingCatalogConfirmPayload) => {
     return new Promise<boolean>((resolve) => {
@@ -109,6 +119,20 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
   const onExistingCatalogSkip = useCallback(() => {
     resolveExistingCatalogConfirm(false);
   }, [resolveExistingCatalogConfirm]);
+
+  const requestMappingsReviewConfirm = useCallback((payload: MappingsReviewPayload) => {
+    return new Promise<MappingsReviewResult>((resolve) => {
+      mappingsReviewResolverRef.current = resolve;
+      setMappingsReviewPayload(payload);
+    });
+  }, []);
+
+  const completeMappingsReview = useCallback((result: MappingsReviewResult) => {
+    setMappingsReviewPayload(null);
+    const r = mappingsReviewResolverRef.current;
+    mappingsReviewResolverRef.current = null;
+    r?.(result);
+  }, []);
 
   const setSourceKey = useCallback((v: string) => {
     setSourceKeyState(v);
@@ -214,6 +238,7 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
       loadKeysFromStorage,
       persistKeys,
       requestExistingCatalogConfirm,
+      requestMappingsReviewConfirm,
     }),
     [
       step,
@@ -238,6 +263,7 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
       persistKeys,
       loadKeysFromStorage,
       requestExistingCatalogConfirm,
+      requestMappingsReviewConfirm,
     ],
   );
 
@@ -250,6 +276,11 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
         destCatalogName={existingCatalogConfirm?.destCatalogName ?? ''}
         onContinue={onExistingCatalogContinue}
         onSkip={onExistingCatalogSkip}
+      />
+      <MappingsReviewDialog
+        open={mappingsReviewPayload !== null}
+        payload={mappingsReviewPayload}
+        onResolve={completeMappingsReview}
       />
     </MigrationContext.Provider>
   );

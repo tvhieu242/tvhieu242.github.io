@@ -3,9 +3,10 @@ import {
   bulkCreateItems,
   catalogItemDocumentPayload,
   createCatalog,
+  definedMappingsToUpdates,
   getCatalogItems,
   getFieldMappings,
-  setFieldMappings,
+  setFieldMappingsUpdates,
 } from '../api/iterableClient';
 import { useMigrationContext } from '../context/MigrationContext';
 import type { CatalogMigrationPhase } from '../types/iterable';
@@ -20,6 +21,7 @@ export function useMigration() {
     updateCatalogProgress,
     setMigrationRunning,
     requestExistingCatalogConfirm,
+    requestMappingsReviewConfirm,
   } = useMigrationContext();
 
   const destinationCatalogName = useCallback(
@@ -48,6 +50,12 @@ export function useMigration() {
 
       setPhase('copying-schema');
       const mappings = await getFieldMappings(sourceKey, catalogName, log);
+      const mappingsUpdates =
+        mappings.definedMappings && typeof mappings.definedMappings === 'object'
+          ? definedMappingsToUpdates(mappings.definedMappings)
+          : [];
+      const hasMappingsPayload = mappingsUpdates.length > 0;
+
       if (!config.dryRun) {
         const { alreadyExists } = await createCatalog(destKey, destCatalogName, log);
         if (alreadyExists) {
@@ -60,13 +68,28 @@ export function useMigration() {
             return;
           }
         }
-        const hasDefined =
-          mappings.definedMappings &&
-          typeof mappings.definedMappings === 'object' &&
-          Object.keys(mappings.definedMappings).length > 0;
-        if (hasDefined) {
-          await setFieldMappings(destKey, destCatalogName, mappings, log);
+        if (hasMappingsPayload) {
+          setPhase('review-mappings');
+          const result = await requestMappingsReviewConfirm({
+            sourceCatalogName: catalogName,
+            destCatalogName: destCatalogName,
+            mappingsUpdates,
+            undefinedFields: mappings.undefinedFields,
+            dryRun: false,
+          });
+          if (result.outcome === 'apply') {
+            await setFieldMappingsUpdates(destKey, destCatalogName, result.mappingsUpdates, log);
+          }
         }
+      } else if (hasMappingsPayload) {
+        setPhase('review-mappings');
+        await requestMappingsReviewConfirm({
+          sourceCatalogName: catalogName,
+          destCatalogName: destCatalogName,
+          mappingsUpdates,
+          undefinedFields: mappings.undefinedFields,
+          dryRun: true,
+        });
       }
 
       setPhase('copying-items');
@@ -116,6 +139,7 @@ export function useMigration() {
       log,
       updateCatalogProgress,
       requestExistingCatalogConfirm,
+      requestMappingsReviewConfirm,
     ],
   );
 

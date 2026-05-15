@@ -294,16 +294,81 @@ export function definedMappingsToUpdates(
   return out;
 }
 
-export async function setFieldMappings(
+function normalizeFieldMappingNode(
+  x: unknown,
+  path: string,
+): { ok: true; node: CatalogFieldDefinitionSerializedModel } | { ok: false; error: string } {
+  if (typeof x !== 'object' || x === null || Array.isArray(x)) {
+    return { ok: false, error: `${path} must be an object` };
+  }
+  const o = x as Record<string, unknown>;
+  if (typeof o.fieldName !== 'string' || o.fieldName.length === 0) {
+    return { ok: false, error: `${path}.fieldName must be a non-empty string` };
+  }
+  if (typeof o.fieldType !== 'string' || o.fieldType.length === 0) {
+    return { ok: false, error: `${path}.fieldType must be a non-empty string` };
+  }
+
+  let children: CatalogFieldDefinitionSerializedModel[] | undefined;
+  if (o.children !== undefined) {
+    if (!Array.isArray(o.children)) {
+      return { ok: false, error: `${path}.children must be an array` };
+    }
+    const next: CatalogFieldDefinitionSerializedModel[] = [];
+    for (let i = 0; i < o.children.length; i++) {
+      const cn = normalizeFieldMappingNode(o.children[i], `${path}.children[${i}]`);
+      if (!cn.ok) return cn;
+      next.push(cn.node);
+    }
+    if (next.length > 0) children = next;
+  }
+
+  return {
+    ok: true,
+    node: {
+      fieldName: o.fieldName,
+      fieldType: o.fieldType,
+      ...(children ? { children } : {}),
+    },
+  };
+}
+
+/** Parse and validate the JSON body for PUT /catalogs/{name}/fieldMappings (expects `{ mappingsUpdates: [...] }`). */
+export function parseMappingsUpdatesPutBody(jsonText: string):
+  | { ok: true; mappingsUpdates: CatalogFieldDefinitionSerializedModel[] }
+  | { ok: false; error: string } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(jsonText);
+  } catch (e) {
+    const msg = e instanceof SyntaxError ? e.message : 'Invalid JSON';
+    return { ok: false, error: msg };
+  }
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: 'Root value must be a JSON object' };
+  }
+  const root = raw as Record<string, unknown>;
+  if (!Array.isArray(root.mappingsUpdates)) {
+    return { ok: false, error: 'Missing or invalid top-level mappingsUpdates array' };
+  }
+  const out: CatalogFieldDefinitionSerializedModel[] = [];
+  for (let i = 0; i < root.mappingsUpdates.length; i++) {
+    const n = normalizeFieldMappingNode(root.mappingsUpdates[i], `mappingsUpdates[${i}]`);
+    if (!n.ok) return n;
+    out.push(n.node);
+  }
+  return { ok: true, mappingsUpdates: out };
+}
+
+export async function setFieldMappingsUpdates(
   apiKey: string,
   catalogName: string,
-  mappings: CatalogFieldMappingsResponse,
+  mappingsUpdates: CatalogFieldDefinitionSerializedModel[],
   log?: LogFn,
 ): Promise<void> {
-  const updates = definedMappingsToUpdates(mappings.definedMappings);
-  if (updates.length === 0) return;
+  if (mappingsUpdates.length === 0) return;
 
-  const body: CatalogMappingsUpdateRequest = { mappingsUpdates: updates };
+  const body: CatalogMappingsUpdateRequest = { mappingsUpdates };
   const enc = encodeURIComponent(catalogName);
   const res = await fetchWithRetry(
     `/catalogs/${enc}/fieldMappings`,
@@ -319,6 +384,16 @@ export async function setFieldMappings(
     const t = await res.text();
     throw new Error(t || `Set field mappings failed: ${res.status}`);
   }
+}
+
+export async function setFieldMappings(
+  apiKey: string,
+  catalogName: string,
+  mappings: CatalogFieldMappingsResponse,
+  log?: LogFn,
+): Promise<void> {
+  const updates = definedMappingsToUpdates(mappings.definedMappings);
+  await setFieldMappingsUpdates(apiKey, catalogName, updates, log);
 }
 
 export async function createCatalog(

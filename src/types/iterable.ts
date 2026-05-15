@@ -73,6 +73,7 @@ export interface ApiLogEntry {
 export type CatalogMigrationPhase =
   | 'pending'
   | 'copying-schema'
+  | 'review-mappings'
   | 'copying-items'
   | 'done'
   | 'error'

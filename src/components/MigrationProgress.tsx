@@ -10,6 +10,8 @@ function phaseLabel(phase: CatalogMigrationPhase): string {
       return 'Pending';
     case 'copying-schema':
       return 'Copying schema';
+    case 'review-mappings':
+      return 'Review mappings';
     case 'copying-items':
       return 'Copying items';
     case 'done':
@@ -33,6 +35,7 @@ function phaseBadgeClass(phase: CatalogMigrationPhase): string {
       return 'bg-amber-100 text-amber-900';
     case 'copying-schema':
     case 'copying-items':
+    case 'review-mappings':
       return 'bg-sky-100 text-sky-800';
     default:
       return 'bg-slate-100 text-slate-700';
