@@ -9,7 +9,10 @@ import type {
   IterableApiResponse,
 } from '../types/iterable';
 
-const API_PREFIX = '/iterable-api';
+/** Dev: Vite proxy (`vite.config.ts`) maps this to `https://api.iterable.com/api`. Prod: call Iterable directly. */
+const API_BASE = import.meta.env.DEV
+  ? '/iterable-api'
+  : 'https://api.iterable.com/api';
 
 export type LogFn = (entry: Omit<ApiLogEntry, 'id' | 'timestamp'>) => void;
 
@@ -33,7 +36,7 @@ async function fetchWithRetry(
   log?: LogFn,
   catalog?: string,
 ): Promise<Response> {
-  const url = `${API_PREFIX}${path}`;
+  const url = `${API_BASE}${path}`;
   const method = (init.method ?? 'GET').toUpperCase();
   const maxAttempts = 3;
   let lastError: Error | undefined;
