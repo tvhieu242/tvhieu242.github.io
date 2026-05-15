@@ -32,10 +32,18 @@ jobs:
 
       - run: npm ci
 
+      # User/Org site repo "<owner>.github.io" is served at domain root (/), not /<repo>/.
+      # Using /${repo}/ there breaks JS/CSS URLs and yields a blank page.
       - name: Build
-        run: npm run build
-        env:
-          BASE_PATH: /${{ github.event.repository.name }}/
+        run: |
+          name="${GITHUB_REPOSITORY##*/}"
+          owner="${GITHUB_REPOSITORY%%/*}"
+          if [ "$name" = "${owner}.github.io" ]; then
+            export BASE_PATH=/
+          else
+            export BASE_PATH="/$name/"
+          fi
+          npm run build
 
       - uses: actions/upload-pages-artifact@v5
         with:
