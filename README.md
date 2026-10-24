@@ -25,6 +25,17 @@ npm run build
 npm run preview   # optional: preview production build locally
 ```
 
+## Deploy (GitHub Pages)
+
+This repo is **`tvhieu242.github.io`**, so the site is served at the root: **https://tvhieu242.github.io/**
+
+1. In the repo on GitHub: **Settings → Pages → Build and deployment → Source** → **GitHub Actions**.
+2. Push to `main` (or run **Deploy to GitHub Pages** from the Actions tab).
+
+The workflow in `.github/workflows/deploy-pages.yml` runs `npm run build` and publishes `dist/`.
+
+**Note:** Unlike Vercel, GitHub Pages cannot proxy `/iterable-api`. The production build calls Iterable’s API directly from the browser, which may be blocked by CORS unless Iterable allows your Pages origin. For full API support in production, use Vercel (see below) or run locally with `npm run dev`.
+
 ## Deploy (Vercel)
 
 `vercel.json` rewrites `/iterable-api/*` to Iterable’s API so the deployed app can call the API from the browser without changing the frontend origin.
